@@ -65,7 +65,7 @@ const LandingPage = () => {
         </h1>
 
         <p className="text-muted" style={{ fontSize: '1.2rem', marginBottom: '2.5rem', lineHeight: '1.7' }}>
-          Project Bank Sampah Anya, (nanti ubah aja apa, bebas)
+          WebApp Bank Sampah develop by D3 Sanitasi Kelas B
         </p>
 
         <div className="flex gap-4 justify-center" style={{ flexWrap: 'wrap' }}>
