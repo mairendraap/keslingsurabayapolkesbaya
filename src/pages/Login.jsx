@@ -6,6 +6,7 @@ import { LogIn, Leaf } from 'lucide-react';
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAppContext();
   const navigate = useNavigate();
