@@ -44,6 +44,8 @@ export const AppProvider = ({ children }) => {
 
   // Real-time listeners
   useEffect(() => {
+    setLoading(true);
+    
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUsers(usersData);
@@ -52,16 +54,24 @@ export const AppProvider = ({ children }) => {
       if (snapshot.empty) {
         seedInitialData();
       }
+    }, (error) => {
+      console.error("Firestore Users Error:", error);
+      setLoading(false);
     });
 
     const unsubCats = onSnapshot(collection(db, 'categories'), (snapshot) => {
       const catsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCategories(catsData);
+    }, (error) => {
+      console.error("Firestore Categories Error:", error);
     });
 
     const unsubTxs = onSnapshot(query(collection(db, 'transactions'), orderBy('date', 'desc')), (snapshot) => {
       const txsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTransactions(txsData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore Transactions Error:", error);
       setLoading(false);
     });
 

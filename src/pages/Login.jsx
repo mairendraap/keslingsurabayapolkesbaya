@@ -71,9 +71,23 @@ const Login = () => {
               required
             />
           </div>
-          <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-            <LogIn size={20} />
-            Login
+          <button 
+            type="submit" 
+            className="btn-primary" 
+            style={{ width: '100%', justifyContent: 'center' }}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin" style={{ marginRight: '0.5rem', width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                Sedang Masuk...
+              </>
+            ) : (
+              <>
+                <LogIn size={20} />
+                Login
+              </>
+            )}
           </button>
         </form>
 
