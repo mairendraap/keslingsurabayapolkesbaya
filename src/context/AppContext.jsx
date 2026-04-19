@@ -97,17 +97,22 @@ export const AppProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
-    const q = query(collection(db, 'users'), where('username', '==', username), where('password', '==', password));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      const userId = userDoc.id;
-      setCurrentUserId(userId);
-      localStorage.setItem('pb_loggedUserId', userId);
-      return true;
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', username), where('password', '==', password));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userId = userDoc.id;
+        setCurrentUserId(userId);
+        localStorage.setItem('pb_loggedUserId', userId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Login Error:", error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
@@ -116,23 +121,29 @@ export const AppProvider = ({ children }) => {
   };
 
   const register = async (userData) => {
-    const q = query(collection(db, 'users'), where('username', '==', userData.username));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      return false; // username already exists
-    }
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', userData.username));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        console.log("Register: Username already exists in Firestore");
+        return false; // username already exists
+      }
 
-    const newUser = {
-      ...userData,
-      role: 'nasabah',
-      balance: 0,
-      totalWeight: 0,
-      createdAt: new Date().toISOString()
-    };
-    
-    await addDoc(collection(db, 'users'), newUser);
-    return true;
+      const newUser = {
+        ...userData,
+        role: 'nasabah',
+        balance: 0,
+        totalWeight: 0,
+        createdAt: new Date().toISOString()
+      };
+      
+      await addDoc(collection(db, 'users'), newUser);
+      return true;
+    } catch (error) {
+      console.error("Register Error:", error);
+      return false;
+    }
   };
 
   const addTransaction = async (targetUserId, type, details, weight, amount) => {
