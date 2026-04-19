@@ -1,11 +1,24 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { collection, onSnapshot, doc, setDoc, updateDoc, addDoc, getDocs } from 'firebase/firestore';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  doc, 
+  query, 
+  where, 
+  setDoc, 
+  getDoc,
+  onSnapshot,
+  orderBy
+} from 'firebase/firestore';
 import { db } from '../firebase';
 
 const AppContext = createContext();
 
 export const useAppContext = () => useContext(AppContext);
 
+// In-memory defaults (for seeding)
 const DEFAULT_CATEGORIES = [
   { id: 'organik', name: 'Organik', pricePerKg: 1000 },
   { id: 'anorganik', name: 'Anorganik', pricePerKg: 2000 },
@@ -24,56 +37,64 @@ export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  
-  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem('loggedUserId'));
+  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem('pb_loggedUserId'));
+  const [loading, setLoading] = useState(true);
+
   const currentUser = users.find(u => u.id === currentUserId) || null;
 
-  // Initialize DB if empty
+  // Real-time listeners
   useEffect(() => {
-    const initDb = async () => {
-      const usersSnap = await getDocs(collection(db, "users"));
-      if (usersSnap.empty) {
-        DEFAULT_USERS.forEach(async (u) => {
-          await setDoc(doc(db, "users", u.id), u);
-        });
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(usersData);
+      
+      // If db is empty, seed it
+      if (snapshot.empty) {
+        seedInitialData();
       }
-      const catSnap = await getDocs(collection(db, "categories"));
-      if (catSnap.empty) {
-        DEFAULT_CATEGORIES.forEach(async (c) => {
-          await setDoc(doc(db, "categories", c.id), c);
-        });
-      }
-    };
-    initDb();
-  }, []);
-
-  // Sync real-time
-  useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), snapshot => {
-      setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubCategories = onSnapshot(collection(db, "categories"), snapshot => {
-      setCategories(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubCats = onSnapshot(collection(db, 'categories'), (snapshot) => {
+      const catsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategories(catsData);
     });
 
-    const unsubTransactions = onSnapshot(collection(db, "transactions"), snapshot => {
-      const txs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setTransactions(txs.sort((a,b) => new Date(b.date) - new Date(a.date)));
+    const unsubTxs = onSnapshot(query(collection(db, 'transactions'), orderBy('date', 'desc')), (snapshot) => {
+      const txsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTransactions(txsData);
+      setLoading(false);
     });
 
     return () => {
       unsubUsers();
-      unsubCategories();
-      unsubTransactions();
+      unsubCats();
+      unsubTxs();
     };
   }, []);
 
-  const login = (username, password) => {
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUserId(user.id);
-      localStorage.setItem('loggedUserId', user.id);
+  const seedInitialData = async () => {
+    console.log('Seeding initial data to Firestore...');
+    // Seed users
+    for (const user of DEFAULT_USERS) {
+      const { id, ...userData } = user;
+      await setDoc(doc(db, 'users', id), userData);
+    }
+    // Seed categories
+    for (const cat of DEFAULT_CATEGORIES) {
+      const { id, ...catData } = cat;
+      await setDoc(doc(db, 'categories', id), catData);
+    }
+  };
+
+  const login = async (username, password) => {
+    const q = query(collection(db, 'users'), where('username', '==', username), where('password', '==', password));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userId = userDoc.id;
+      setCurrentUserId(userId);
+      localStorage.setItem('pb_loggedUserId', userId);
       return true;
     }
     return false;
@@ -81,21 +102,26 @@ export const AppProvider = ({ children }) => {
 
   const logout = () => {
     setCurrentUserId(null);
-    localStorage.removeItem('loggedUserId');
+    localStorage.removeItem('pb_loggedUserId');
   };
 
   const register = async (userData) => {
-    if (users.find(u => u.username === userData.username)) {
+    const q = query(collection(db, 'users'), where('username', '==', userData.username));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
       return false; // username already exists
     }
-    const newId = 'u' + Date.now();
+
     const newUser = {
       ...userData,
       role: 'nasabah',
       balance: 0,
-      totalWeight: 0
+      totalWeight: 0,
+      createdAt: new Date().toISOString()
     };
-    await setDoc(doc(db, "users", newId), newUser);
+    
+    await addDoc(collection(db, 'users'), newUser);
     return true;
   };
 
@@ -109,33 +135,38 @@ export const AppProvider = ({ children }) => {
       date: new Date().toISOString()
     };
     
-    // Add transaction document
-    await addDoc(collection(db, "transactions"), newTx);
+    await addDoc(collection(db, 'transactions'), newTx);
 
-    // Update user balance
-    const targetUser = users.find(u => u.id === targetUserId);
-    if (targetUser) {
-      const userRef = doc(db, "users", targetUserId);
+    // Update user balance in Firestore
+    const userRef = doc(db, 'users', targetUserId);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
       await updateDoc(userRef, {
-        balance: targetUser.balance + amount,
-        totalWeight: targetUser.totalWeight + (weight || 0)
+        balance: (userData.balance || 0) + amount,
+        totalWeight: (userData.totalWeight || 0) + (weight || 0)
       });
     }
   };
 
   const updateCategoryPrice = async (categoryId, newPrice) => {
-    const catRef = doc(db, "categories", categoryId);
-    await updateDoc(catRef, { pricePerKg: Number(newPrice) });
+    const catRef = doc(db, 'categories', categoryId);
+    await updateDoc(catRef, {
+      pricePerKg: Number(newPrice)
+    });
   };
 
   const updateUserRole = async (userId, newRole) => {
-    const userRef = doc(db, "users", userId);
-    await updateDoc(userRef, { role: newRole });
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      role: newRole
+    });
   };
 
   const getSystemStats = () => {
-    const totalBalance = users.reduce((acc, user) => acc + user.balance, 0);
-    const totalWeight = users.reduce((acc, user) => acc + user.totalWeight, 0);
+    const totalBalance = users.reduce((acc, user) => acc + (user.balance || 0), 0);
+    const totalWeight = users.reduce((acc, user) => acc + (user.totalWeight || 0), 0);
     return { totalBalance, totalWeight };
   };
 
@@ -145,6 +176,7 @@ export const AppProvider = ({ children }) => {
       currentUser, 
       categories, 
       transactions, 
+      loading,
       login, 
       logout,
       register,
@@ -157,3 +189,4 @@ export const AppProvider = ({ children }) => {
     </AppContext.Provider>
   );
 };
+

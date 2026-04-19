@@ -3,7 +3,15 @@ import { Wallet, Scale, History, Users, Database } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const Dashboard = () => {
-  const { currentUser, transactions, getSystemStats, users } = useAppContext();
+  const { currentUser, transactions, getSystemStats, users, loading } = useAppContext();
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center" style={{ height: '50vh' }}>
+        <div className="animate-pulse text-muted">Memuat data dashboard...</div>
+      </div>
+    );
+  }
 
   // For Nasabah
   const userTransactions = useMemo(() => {

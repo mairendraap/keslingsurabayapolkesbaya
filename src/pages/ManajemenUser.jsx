@@ -6,34 +6,34 @@ import Swal from 'sweetalert2';
 const ManajemenUser = () => {
   const { users, currentUser, updateUserRole } = useAppContext();
 
-  const handleRoleChange = (userId, newRole) => {
+  const handleRoleChange = async (userId, newRole) => {
     // don't let admin demote themselves directly ideally, but for demo it's fine
     if (userId === currentUser.id && newRole !== 'admin') {
-      Swal.fire({
+      const result = await Swal.fire({
         title: 'Perhatian!',
         text: 'Anda yakin ingin mengubah peran Anda sendiri? Anda mungkin akan kehilangan akses halaman ini.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Ya, Ubah',
         cancelButtonText: 'Batal'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          updateUserRole(userId, newRole);
-          Swal.fire('Berhasil!', 'Peran berhasil diubah.', 'success');
-        }
       });
-      return;
+      
+      if (!result.isConfirmed) return;
     }
 
-    updateUserRole(userId, newRole);
-    Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'success',
-      title: 'Peran pengguna diperbarui',
-      showConfirmButton: false,
-      timer: 1500
-    });
+    try {
+      await updateUserRole(userId, newRole);
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Peran pengguna diperbarui',
+        showConfirmButton: false,
+        timer: 1500
+      });
+    } catch (error) {
+      Swal.fire('Error!', 'Gagal mengubah peran pengguna.', 'error');
+    }
   };
 
   return (

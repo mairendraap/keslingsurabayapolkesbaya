@@ -6,16 +6,27 @@ import { LogIn, Leaf } from 'lucide-react';
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAppContext();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (login(username, password)) {
-      navigate('/dashboard');
-    } else {
-      setError('Username atau password salah');
+    setLoading(true);
+    setError('');
+    
+    try {
+      const success = await login(username, password);
+      if (success) {
+        navigate('/dashboard');
+      } else {
+        setError('Username atau password salah');
+      }
+    } catch (err) {
+      setError('Terjadi kesalahan saat login. Silakan coba lagi.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 

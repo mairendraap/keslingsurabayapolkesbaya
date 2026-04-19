@@ -3,7 +3,15 @@ import { History, Search } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const RiwayatTransaksi = () => {
-  const { transactions, currentUser, users } = useAppContext();
+  const { transactions, currentUser, users, loading } = useAppContext();
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center" style={{ height: '50vh' }}>
+        <div className="animate-pulse text-muted">Memuat riwayat transaksi...</div>
+      </div>
+    );
+  }
   const [filterType, setFilterType] = useState('all'); // 'all', 'setor', 'tarik'
 
   const filteredTransactions = useMemo(() => {
